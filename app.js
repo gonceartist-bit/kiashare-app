@@ -119,6 +119,28 @@
     return String(s).replace(/[\\/:*?"<>|]/g, "-");
   }
 
+  // ---------- connection diagnostics ----------
+  // Surfaces the *real* WebRTC failure reason instead of a generic "connection failed",
+  // and watches ICE connection state live so a stuck negotiation is visible immediately.
+  function attachConnDiagnostics(dataConn, onStatus) {
+    dataConn.on("error", (err) => {
+      onStatus("خطای اتصال: " + (err && (err.type || err.message) || err));
+    });
+
+    function watchPC() {
+      const pc = dataConn.peerConnection;
+      if (!pc) { setTimeout(watchPC, 200); return; }
+      pc.oniceconnectionstatechange = () => {
+        const state = pc.iceConnectionState;
+        if (state === "checking") onStatus("در حال پیدا کردن مسیر اتصال…");
+        else if (state === "connected" || state === "completed") onStatus("اتصال برقرار شد");
+        else if (state === "failed") onStatus("اتصال شکست خورد (ICE failed) — احتمالاً فایروال شبکه UDP/TURN رو مسدود کرده. دوباره امتحان کن یا شبکه رو عوض کن.");
+        else if (state === "disconnected") onStatus("اتصال قطع شد، در حال تلاش دوباره…");
+      };
+    }
+    watchPC();
+  }
+
   // ================= HOME =================
   document.getElementById("btn-send").addEventListener("click", () => {
     showScreen("screen-pick");
@@ -196,6 +218,7 @@
     peer.on("connection", (c) => {
       conn = c;
       qrStatus.textContent = "متصل شد، در حال شروع انتقال…";
+      attachConnDiagnostics(conn, (msg) => { qrStatus.textContent = msg; });
       conn.on("open", () => sendAllFiles());
     });
 
@@ -342,11 +365,13 @@
         recvStartTime = Date.now();
       });
       conn.on("data", handleIncomingData);
-      conn.on("error", (err) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timeoutId);
-        connectStatus.textContent = "اتصال برقرار نشد";
+      attachConnDiagnostics(conn, (msg) => {
+        if (settled && msg.indexOf("شکست") === -1) return; // once connected, only surface real failures
+        connectStatus.textContent = msg;
+        if (msg.indexOf("شکست") > -1) {
+          settled = true;
+          clearTimeout(timeoutId);
+        }
       });
     });
     peer.on("error", (err) => {
