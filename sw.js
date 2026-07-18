@@ -1,4 +1,4 @@
-const CACHE_NAME = "filedrop-shell-v1";
+const CACHE_NAME = "filedrop-shell-v2";
 const SHELL_FILES = [
   "./",
   "./index.html",
@@ -26,11 +26,26 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  const url = new URL(event.request.url);
+  const req = event.request;
+  const url = new URL(req.url);
   // only handle same-origin shell requests; let PeerJS/CDN/signaling traffic pass through
   if (url.origin !== location.origin) return;
 
+  // opening the app: always prefer a fresh network copy, and only fall back
+  // to the cached shell if the network truly fails (offline / no connection)
+  if (req.mode === "navigate") {
+    event.respondWith(
+      fetch(req).catch(() => caches.match("./index.html"))
+    );
+    return;
+  }
+
+  // other assets (js/css/icons): serve from cache (ignoring query strings so
+  // install-time URL params don't cause a false cache miss), else go to network
   event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request))
+    caches.match(req, { ignoreSearch: true }).then((cached) => {
+      if (cached) return cached;
+      return fetch(req).catch(() => cached);
+    })
   );
 });
