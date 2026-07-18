@@ -5,6 +5,18 @@
   const BUFFER_HIGH_WATER = 4 * 1024 * 1024; // pause sending above this
   const PEER_PREFIX = "filedrop-";
 
+  // STUN for direct NAT traversal + a free public TURN relay as a fallback
+  // for when the two devices are on different networks and can't connect directly
+  const ICE_CONFIG = {
+    iceServers: [
+      { urls: "stun:stun.l.google.com:19302" },
+      { urls: "stun:stun1.l.google.com:19302" },
+      { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
+      { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
+      { urls: "turn:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" }
+    ]
+  };
+
   let peer = null;
   let conn = null;
   let pickedFiles = [];
@@ -171,7 +183,7 @@
   function startSenderPeer(retry) {
     const code = randomCode();
     if (peer) peer.destroy();
-    peer = new Peer(PEER_PREFIX + code, { debug: 0, serialization: "none" });
+    peer = new Peer(PEER_PREFIX + code, { debug: 0, serialization: "none", config: ICE_CONFIG });
 
     peer.on("open", () => {
       pairCodeEl.textContent = toPersianDigits(code);
@@ -307,10 +319,22 @@
 
   function connectToCode(code) {
     connectStatus.textContent = "در حال اتصال…";
-    peer = new Peer(undefined, { debug: 0, serialization: "none" });
+    let settled = false;
+
+    const timeoutId = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      connectStatus.textContent = "اتصال برقرار نشد (وقفه). مطمئن شو هر دو دستگاه اینترنت/وای‌فای دارن و دوباره امتحان کن.";
+      if (peer) peer.destroy();
+    }, 15000);
+
+    peer = new Peer(undefined, { debug: 0, serialization: "none", config: ICE_CONFIG });
     peer.on("open", () => {
       conn = peer.connect(PEER_PREFIX + code, { reliable: true, serialization: "none" });
       conn.on("open", () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeoutId);
         connectStatus.textContent = "متصل شد";
         showScreen("screen-transfer");
         resetTransferScreen("در حال دریافت");
@@ -319,10 +343,16 @@
       });
       conn.on("data", handleIncomingData);
       conn.on("error", (err) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeoutId);
         connectStatus.textContent = "اتصال برقرار نشد";
       });
     });
     peer.on("error", (err) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutId);
       connectStatus.textContent = "اتصال برقرار نشد: " + err.type;
     });
   }
