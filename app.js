@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  const CHUNK_SIZE = 16 * 1024; // 16KB per chunk
+  const CHUNK_SIZE = 64 * 1024; // 64KB per chunk
   const BUFFER_HIGH_WATER = 4 * 1024 * 1024; // pause sending above this
   const PEER_PREFIX = "filedrop-";
 
@@ -171,7 +171,7 @@
   function startSenderPeer(retry) {
     const code = randomCode();
     if (peer) peer.destroy();
-    peer = new Peer(PEER_PREFIX + code, { debug: 0 });
+    peer = new Peer(PEER_PREFIX + code, { debug: 0, serialization: "none" });
 
     peer.on("open", () => {
       pairCodeEl.textContent = toPersianDigits(code);
@@ -246,9 +246,14 @@
       let offset = 0;
       const buf = await file.arrayBuffer();
       while (offset < buf.byteLength) {
-        // backpressure: wait if channel buffer is too full
-        while (conn.dataChannel && conn.dataChannel.bufferedAmount > BUFFER_HIGH_WATER) {
-          await new Promise((r) => setTimeout(r, 50));
+        // backpressure: wait for the channel to drain instead of polling
+        const dc = conn.dataChannel;
+        if (dc && dc.bufferedAmount > BUFFER_HIGH_WATER) {
+          await new Promise((resolve) => {
+            dc.bufferedAmountLowThreshold = CHUNK_SIZE * 4;
+            const onLow = () => { dc.removeEventListener("bufferedamountlow", onLow); resolve(); };
+            dc.addEventListener("bufferedamountlow", onLow);
+          });
         }
         const chunk = buf.slice(offset, offset + CHUNK_SIZE);
         conn.send(chunk);
@@ -302,9 +307,9 @@
 
   function connectToCode(code) {
     connectStatus.textContent = "در حال اتصال…";
-    peer = new Peer(undefined, { debug: 0 });
+    peer = new Peer(undefined, { debug: 0, serialization: "none" });
     peer.on("open", () => {
-      conn = peer.connect(PEER_PREFIX + code, { reliable: true });
+      conn = peer.connect(PEER_PREFIX + code, { reliable: true, serialization: "none" });
       conn.on("open", () => {
         connectStatus.textContent = "متصل شد";
         showScreen("screen-transfer");
@@ -342,20 +347,31 @@
             .then(() => getNestedDir(rootDirHandle, [category, dateFolder]))
             .then((dir) => dir.getFileHandle(safeName(msg.name), { create: true }))
             .then((fh) => fh.createWritable())
-            .then((w) => { currentWritable = w; });
+            .then((w) => { currentWritable = w; })
+            .catch((err) => {
+              currentStatusEl.textContent = "خطا";
+              document.getElementById("transfer-title").textContent = "ذخیره ناموفق بود: " + err.message;
+            });
         } else {
           // fallback: label the filename so it can be sorted manually after a plain download
           incomingMeta._fallbackName = category + "_" + dateFolder + "_" + safeName(msg.name);
         }
       } else if (msg.type === "eof") {
         if (rootDirHandle) {
-          writeChain = writeChain.then(() => currentWritable.close()).then(() => {
-            currentStatusEl.textContent = "✓";
-            currentStatusEl.classList.add("done");
-            receivedFilesInfo.push(msg.name);
-            document.getElementById("transfer-title").textContent =
-              receivedFilesInfo.length + " فایل ذخیره شد";
-          });
+          writeChain = writeChain
+            .then(() => currentWritable && currentWritable.close())
+            .then(() => {
+              if (currentStatusEl.textContent === "خطا") return;
+              currentStatusEl.textContent = "✓";
+              currentStatusEl.classList.add("done");
+              receivedFilesInfo.push(msg.name);
+              document.getElementById("transfer-title").textContent =
+                receivedFilesInfo.length + " فایل ذخیره شد";
+            })
+            .catch((err) => {
+              currentStatusEl.textContent = "خطا";
+              document.getElementById("transfer-title").textContent = "ذخیره ناموفق بود: " + err.message;
+            });
         } else {
           const blob = new Blob(incomingChunks, { type: incomingMeta.mime || "application/octet-stream" });
           const url = URL.createObjectURL(blob);
@@ -405,7 +421,7 @@
     }
     if (supportsFolderPicker) {
       try {
-        rootDirHandle = await window.showDirectoryPicker();
+        rootDirHandle = await window.showDirectoryPicker({ mode: "readwrite" });
       } catch (e) {
         rootDirHandle = null; // user cancelled the picker — fall back to plain downloads
       }
