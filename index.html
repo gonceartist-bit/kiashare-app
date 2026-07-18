@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>انتقال فایل</title>
+<meta name="theme-color" content="#0c447c">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app">
+
+  <!-- صفحه اصلی -->
+  <section id="screen-home" class="screen active">
+    <div class="card">
+      <div class="icon-badge">⇄</div>
+      <h1>انتقال فایل</h1>
+      <p class="sub">فایل رو بین موبایل و کامپیوتر رد و بدل کن، بدون اینترنت و بدون واسطه</p>
+      <button id="btn-send" class="btn btn-primary">ارسال فایل</button>
+      <button id="btn-receive" class="btn">دریافت فایل</button>
+    </div>
+  </section>
+
+  <!-- صفحه ارسال: انتخاب فایل -->
+  <section id="screen-pick" class="screen">
+    <button class="btn-back" data-back="screen-home">‹ بازگشت</button>
+    <div class="card">
+      <h2>انتخاب فایل</h2>
+      <label id="drop-zone" class="drop-zone" for="file-input">
+        <span class="drop-icon">＋</span>
+        <span>فایل‌ها رو انتخاب کن یا اینجا رها کن</span>
+      </label>
+      <input id="file-input" type="file" multiple hidden>
+      <ul id="file-list" class="file-list"></ul>
+      <button id="btn-start-send" class="btn btn-primary" disabled>ساخت لینک اتصال</button>
+    </div>
+  </section>
+
+  <!-- صفحه ارسال: نمایش QR -->
+  <section id="screen-qr" class="screen">
+    <button class="btn-back" data-back="screen-pick">‹ بازگشت</button>
+    <div class="card">
+      <h2>منتظر اتصال گیرنده</h2>
+      <div id="qr-box" class="qr-box"></div>
+      <p class="code-hint">یا این کد را در دستگاه گیرنده وارد کن</p>
+      <div id="pair-code" class="pair-code">----</div>
+      <p id="qr-status" class="status">در حال آماده‌سازی…</p>
+    </div>
+  </section>
+
+  <!-- صفحه دریافت: وارد کردن کد -->
+  <section id="screen-connect" class="screen">
+    <button class="btn-back" data-back="screen-home">‹ بازگشت</button>
+    <div class="card">
+      <h2>اتصال به فرستنده</h2>
+      <p class="sub">کد ۴ رقمی نمایش داده‌شده روی دستگاه فرستنده را وارد کن، یا QR را با دوربین گوشی اسکن کن</p>
+      <p class="sub" style="margin-top:-14px;">در مرورگرهایی که پشتیبانی کنند، قبل از اتصال یه پوشه مقصد انتخاب می‌کنی و فایل‌ها خودکار بر اساس نوع (تصاویر/فیلم‌ها/اسناد) و تاریخ شمسی توی زیرپوشه‌ها ذخیره می‌شن</p>
+      <input id="code-input" class="code-input" maxlength="4" inputmode="numeric" placeholder="۰۰۰۰">
+      <button id="btn-connect" class="btn btn-primary">اتصال</button>
+      <p id="connect-status" class="status"></p>
+    </div>
+  </section>
+
+  <!-- صفحه انتقال -->
+  <section id="screen-transfer" class="screen">
+    <div class="card">
+      <h2 id="transfer-title">در حال انتقال</h2>
+      <div class="progress-overall">
+        <div class="progress-track"><div id="progress-overall-bar" class="progress-bar"></div></div>
+        <div class="progress-meta">
+          <span id="progress-percent">۰٪</span>
+          <span id="progress-speed"></span>
+        </div>
+      </div>
+      <ul id="transfer-list" class="file-list"></ul>
+      <div id="download-actions" class="download-actions"></div>
+      <button id="btn-cancel" class="btn btn-danger">لغو و بازگشت</button>
+    </div>
+  </section>
+
+</div>
+
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
