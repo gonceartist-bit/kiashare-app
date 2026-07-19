@@ -5,15 +5,17 @@
   const BUFFER_HIGH_WATER = 4 * 1024 * 1024; // pause sending above this
   const PEER_PREFIX = "filedrop-";
 
-  // STUN servers help two devices on the same local network / hotspot find
-  // each other directly. (A public TURN relay was tried here previously for
-  // cross-network fallback, but the free static-credential TURN service no
-  // longer authenticates without an API key, so it just hung instead of
-  // failing fast — removed rather than leaving a dead, hang-prone fallback.)
+  // STUN for direct connections when possible, plus a public TURN relay as a
+  // fallback for topologies (like a phone hotspot + PC) where the two devices
+  // can't reach each other directly. Confirmed needed for this setup — do not
+  // remove without testing on the actual hotspot topology first.
   const ICE_CONFIG = {
     iceServers: [
       { urls: "stun:stun.l.google.com:19302" },
-      { urls: "stun:stun1.l.google.com:19302" }
+      { urls: "stun:stun1.l.google.com:19302" },
+      { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
+      { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
+      { urls: "turn:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" }
     ]
   };
 
