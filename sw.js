@@ -1,11 +1,9 @@
-const CACHE_NAME = "filedrop-shell-v3";
+const CACHE_NAME = "filedrop-shell-v2";
 const SHELL_FILES = [
   "./",
   "./index.html",
   "./style.css",
   "./app.js",
-  "./peerjs.min.js",
-  "./qrcode.min.js",
   "./manifest.json",
   "./icon-192.png",
   "./icon-512.png"
@@ -51,4 +49,3 @@ self.addEventListener("fetch", (event) => {
     })
   );
 });
-
